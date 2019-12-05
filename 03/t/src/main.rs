@@ -92,10 +92,18 @@ fn main() {
         }
     */
 
-    let mut min = std::i32::MAX;
+    let mut min_a = std::i32::MAX;
+    let mut min_b = std::i32::MAX;
 
-    for (i, line1) in first_lines.iter().enumerate() {
-        for (j, line2) in second_lines.iter().enumerate() {
+    let mut min_steps_1 = 0;
+    let mut min_steps_2 = 0;
+
+    let mut count_steps_1 = 0;
+
+    for (_i, line1) in first_lines.iter().enumerate() {
+        let mut count_steps_2 = 0;
+
+        for (_j, line2) in second_lines.iter().enumerate() {
             if line1.horizontal != line2.horizontal {
                 let horizontal;
                 let vertical;
@@ -120,18 +128,37 @@ fn main() {
                 {
                     //println!("L1: {:?}", line1);
                     //println!("L2: {:?}", line2);
-                    println!("hit at x: {} y: {}", horizontal.y, vertical.x);
 
-                    if horizontal.y != 0
-                        && vertical.x != 0
-                        && (horizontal.y.abs() + vertical.x.abs()) < min
-                    {
-                        min = horizontal.y.abs() + vertical.x.abs();
+                    let hit_x = vertical.x;
+                    let hit_y = horizontal.y;
+
+                    if hit_y != 0 && hit_x != 0 {
+                        if (hit_y.abs() + hit_x.abs()) < min_a {
+                            min_a = hit_y.abs() + hit_x.abs();
+                        }
+
+                        println!("hit at x: {} y: {}", hit_x, hit_y);
+
+                        println!("{:?}, {:?}", line1.x - hit_x, line1.y - hit_y);
+                        println!("{:?}, {:?}", line2.x - hit_x, line2.y - hit_y);
+
+                        let sum1 = count_steps_1 + (line1.x - hit_x + line1.y - hit_y).abs();
+                        let sum2 = count_steps_2 + (line2.x - hit_x + line2.y - hit_y).abs();
+
+                        println!("sum1 {} sum2 {}", sum1, sum2);
+
+                        if (sum1 + sum2) < min_b {
+                            min_b = sum1 + sum2;
+                        }
                     }
                 }
             }
+
+            count_steps_2 += line2.dist.abs();
         }
+        count_steps_1 += line1.dist.abs();
     }
 
-    println!("res: {:?}", min);
+    println!("1 res: {:?}", min_a);
+    println!("2 res: {:?}", min_b);
 }
