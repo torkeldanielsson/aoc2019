@@ -23,6 +23,10 @@ enum Opcode {
     Multiplication,
     Input,
     Output,
+    JumpIfTrue,
+    JumpIfFalse,
+    LessThan,
+    Equals,
     Break,
 }
 
@@ -32,6 +36,10 @@ fn digit_to_opcode(d: i32) -> Opcode {
         2 => Opcode::Multiplication,
         3 => Opcode::Input,
         4 => Opcode::Output,
+        5 => Opcode::JumpIfTrue,
+        6 => Opcode::JumpIfFalse,
+        7 => Opcode::LessThan,
+        8 => Opcode::Equals,
         99 => Opcode::Break,
         _ => {
             panic!("Illegal opcode {:?}", d);
@@ -84,12 +92,12 @@ fn main() {
 
     let mut pc = 0;
 
-    let input = 1;
+    let input = 5;
 
     while pc < program.len() {
         let opcode = program[pc];
 
-        println!("pc {:?} opcode {:?}", pc, opcode);
+        // println!("pc {:?} opcode {:?}", pc, opcode);
 
         let (op, mode3, mode2, mode1) = parse_op(opcode as usize);
 
@@ -97,10 +105,10 @@ fn main() {
         let val2 = program[pc + 2];
         let val3 = program[pc + 3];
 
-        println!(
-            "op: {:?}, mode1: {:?}, mode2: {:?}, mode3: {:?}, val1: {:?}, val2: {:?}, val3: {:?}",
-            op, mode1, mode2, mode3, val1, val2, val3
-        );
+        // println!(
+        //     "op: {:?}, mode1: {:?}, mode2: {:?}, mode3: {:?}, val1: {:?}, val2: {:?}, val3: {:?}",
+        //     op, mode1, mode2, mode3, val1, val2, val3
+        // );
 
         match op {
             Opcode::Addition => {
@@ -118,11 +126,12 @@ fn main() {
                     b = val2;
                 }
 
-                if mode3 == Mode::Position {
-                    program[val3 as usize] = a + b;
-                } else {
-                    panic!("Uhm... Immediate mode for addition?");
+                if mode3 == Mode::Immediate {
+                    panic!("illegal immediate mode");
                 }
+
+                program[val3 as usize] = a + b;
+
                 pc += 4;
             }
             Opcode::Multiplication => {
@@ -140,19 +149,20 @@ fn main() {
                     b = val2;
                 }
 
-                if mode3 == Mode::Position {
-                    program[val3 as usize] = a * b;
-                } else {
-                    panic!("Uhm... Immediate mode for multiplication?");
+                if mode3 == Mode::Immediate {
+                    panic!("illegal immediate mode");
                 }
+
+                program[val3 as usize] = a * b;
+
                 pc += 4;
             }
             Opcode::Input => {
-                if mode1 == Mode::Position {
-                    program[val1 as usize] = input;
-                } else {
-                    panic!("Uhm... Immediate mode for input?");
+                if mode3 == Mode::Immediate {
+                    panic!("illegal immediate mode");
                 }
+                program[val1 as usize] = input;
+
                 pc += 2;
             }
             Opcode::Output => {
@@ -163,14 +173,110 @@ fn main() {
                 }
                 pc += 2;
             }
+            Opcode::JumpIfTrue => {
+                let a;
+                if mode1 == Mode::Position {
+                    a = program[val1 as usize];
+                } else {
+                    a = val1;
+                }
+
+                let b;
+                if mode2 == Mode::Position {
+                    b = program[val2 as usize];
+                } else {
+                    b = val2;
+                }
+
+                if a != 0 {
+                    pc = b as usize;
+                } else {
+                    pc += 3;
+                }
+            }
+            Opcode::JumpIfFalse => {
+                let a;
+                if mode1 == Mode::Position {
+                    a = program[val1 as usize];
+                } else {
+                    a = val1;
+                }
+
+                let b;
+                if mode2 == Mode::Position {
+                    b = program[val2 as usize];
+                } else {
+                    b = val2;
+                }
+
+                if a == 0 {
+                    pc = b as usize;
+                } else {
+                    pc += 3;
+                }
+            }
+            Opcode::LessThan => {
+                let a;
+                if mode1 == Mode::Position {
+                    a = program[val1 as usize];
+                } else {
+                    a = val1;
+                }
+
+                let b;
+                if mode2 == Mode::Position {
+                    b = program[val2 as usize];
+                } else {
+                    b = val2;
+                }
+
+                if mode3 == Mode::Immediate {
+                    panic!("illegal immediate mode");
+                }
+
+                if a < b {
+                    program[val3 as usize] = 1;
+                } else {
+                    program[val3 as usize] = 0;
+                }
+
+                pc += 4;
+            }
+            Opcode::Equals => {
+                let a;
+                if mode1 == Mode::Position {
+                    a = program[val1 as usize];
+                } else {
+                    a = val1;
+                }
+
+                let b;
+                if mode2 == Mode::Position {
+                    b = program[val2 as usize];
+                } else {
+                    b = val2;
+                }
+
+                if mode3 == Mode::Immediate {
+                    panic!("illegal immediate mode");
+                }
+
+                if a == b {
+                    program[val3 as usize] = 1;
+                } else {
+                    program[val3 as usize] = 0;
+                }
+
+                pc += 4;
+            }
             Opcode::Break => {
                 break;
             }
         }
     }
 
-    for number in program {
-        print!("{:?},", number);
-    }
-    println!("");
+    //for number in program {
+    //    print!("{:?},", number);
+    //}
+    //println!("");
 }
