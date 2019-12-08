@@ -279,7 +279,8 @@ fn run_program(s: &mut ProgramState) {
                 s.pc += 4;
             }
             Opcode::Break => {
-                break;
+                s.return_state = ReturnState::Break;
+                return;
             }
         }
     }
@@ -335,22 +336,21 @@ fn find_combinations(phases_left: &[i32]) -> Vec<Vec<i32>> {
     return res;
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let filename = &args[1];
+fn find_optimal_config(
+    phases_input: &[i32],
+    program: &[i32],
+    input_signal: i32,
+) -> (Vec<i32>, i32) {
+    let combinations = find_combinations(phases_input);
 
-    let input = fs::read_to_string(filename).expect("error reading file");
-
-    let program = parse_program(&input);
-
-    let combinations = find_combinations(&vec![5, 6, 7, 8, 9]);
+    let mut res = (vec![], input_signal);
 
     for combination in &combinations {
         let mut amp_programs: Vec<ProgramState> = Vec::new();
 
         for i in 0..5 {
             amp_programs.push(ProgramState {
-                program: program.clone(),
+                program: program.to_owned(),
                 return_state: ReturnState::Error,
                 inputs: vec![combination[i]],
                 outputs: vec![],
@@ -382,7 +382,31 @@ fn main() {
 
         println!("combination: {:?}, result: {}", combination, last_res);
         std::io::stdout().flush().unwrap();
+
+        if res.0.len() == 0 {
+            res.0 = combination.clone();
+            res.1 = last_res
+        }
+        if res.1 < last_res {
+            res.0 = combination.clone();
+            res.1 = last_res
+        }
     }
+
+    return res;
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let filename = &args[1];
+
+    let input = fs::read_to_string(filename).expect("error reading file");
+
+    let program = parse_program(&input);
+
+    let (order, best_val) = find_optimal_config(&vec![5, 6, 7, 8, 9], &program, 0);
+
+    println!("result: {:?}, {:?}", order, best_val);
 }
 
 #[cfg(test)]
@@ -392,14 +416,14 @@ mod tests {
     #[test]
     fn test_run() {
         {
-            let input = "3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0";
+            let input = "3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5";
             let program = parse_program(&input);
 
-            let optimal_res = find_optimal_config(&vec![0, 1, 2, 3, 4], &program, 0);
+            let optimal_res = find_optimal_config(&vec![5, 6, 7, 8, 9], &program, 0);
 
             println!("{:?}", optimal_res);
 
-            let expected_result = 65210;
+            let expected_result = 139629729;
             assert_eq!(expected_result, optimal_res.1);
         }
     }
