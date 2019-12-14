@@ -15,7 +15,6 @@ fn main() {
 
     for noun in 0..100 {
         for verb in 0..100 {
-
             let mut numbers = original_program.clone();
 
             numbers[1] = noun;
@@ -40,7 +39,10 @@ fn main() {
                 } else if numbers[instruction_pointer] == 2 {
                     numbers[o] = numbers[a] * numbers[b];
                 } else {
-                    println!("unexpected: numbers[{}] = {}", instruction_pointer, numbers[instruction_pointer]);
+                    println!(
+                        "unexpected: numbers[{}] = {}",
+                        instruction_pointer, numbers[instruction_pointer]
+                    );
                 }
 
                 instruction_pointer += 4;
