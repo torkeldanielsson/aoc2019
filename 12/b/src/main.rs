@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 #[derive(Debug, PartialEq, Clone)]
 struct State {
     pos: Vec<i32>,
@@ -52,6 +54,39 @@ fn find_repeat_period(input: Vec<i32>) -> i32 {
     t - 1
 }
 
+fn get_prime_factors(n_in: i64) -> Vec<i64> {
+    let mut n = n_in;
+    let mut res: Vec<i64> = Vec::new();
+
+    while n % 2 == 0 {
+        res.push(2);
+        n = n / 2;
+    }
+
+    for i in 3..=((n as f64).sqrt() as i64) {
+        // While i divides n, print i and divide n
+        while n % i == 0 {
+            res.push(i);
+            n = n / i;
+        }
+    }
+
+    if n > 2 {
+        res.push(n);
+    }
+    res
+}
+
+fn count_occurrence(p: &i64, v: &Vec<i64>) -> i64 {
+    let mut res = 0;
+    for pv in v {
+        if p == pv {
+            res += 1;
+        }
+    }
+    res
+}
+
 fn main() {
     // let x_vals = vec![-1, 2, 4, 3];
     // let y_vals = vec![0, -10, -8, 5];
@@ -66,26 +101,46 @@ fn main() {
     let z_vals = vec![-1, -5, 10, -3];
 
     let x_period = find_repeat_period(x_vals) as i64;
-    println!("x period: {}", x_period);
+    //println!("x period: {}", x_period);
 
     let y_period = find_repeat_period(y_vals) as i64;
-    println!("y period: {}", y_period);
+    //println!("y period: {}", y_period);
 
     let z_period = find_repeat_period(z_vals) as i64;
-    println!("z period: {}", z_period);
+    //println!("z period: {}", z_period);
 
-    let mut largest_period = x_period;
-    if y_period > largest_period {
-        largest_period = y_period;
+    let x_factors = get_prime_factors(x_period);
+    let y_factors = get_prime_factors(y_period);
+    let z_factors = get_prime_factors(z_period);
+
+    let mut primes = HashSet::new();
+    for p in &x_factors {
+        primes.insert(p);
     }
-    if z_period > largest_period {
-        largest_period = z_period;
+    for p in &y_factors {
+        primes.insert(p);
+    }
+    for p in &z_factors {
+        primes.insert(p);
     }
 
-    let mut res: i64 = 1;
-    while res % x_period != 0 || res % y_period != 0 || res % z_period != 0 {
-        res += largest_period;
+    let mut res = 1;
+
+    for p in primes {
+        let mut max_count = 1;
+
+        if count_occurrence(&p, &x_factors) > max_count {
+            max_count = count_occurrence(&p, &x_factors);
+        }
+        if count_occurrence(&p, &y_factors) > max_count {
+            max_count = count_occurrence(&p, &y_factors);
+        }
+        if count_occurrence(&p, &z_factors) > max_count {
+            max_count = count_occurrence(&p, &z_factors);
+        }
+        for _ in 0..max_count {
+            res *= p;
+        }
     }
-    println!("common period: {}", res);
-    println!("...or: {}", x_period * y_period * z_period);
+    println!("res: {}", res);
 }
