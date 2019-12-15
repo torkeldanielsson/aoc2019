@@ -420,6 +420,11 @@ fn main() {
         direction: Direction::Up,
     };
 
+    state.paint_info.push(PaintedSpot {
+        pos: Vec2 { x: 0, y: 0 },
+        color: Color::White,
+    });
+
     while program.return_state != ReturnState::Break {
         run_program(&mut program);
 
