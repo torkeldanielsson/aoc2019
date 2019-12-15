@@ -33,15 +33,15 @@ fn parse_map(input_text: &str) -> Vec<Vec2> {
     positions
 }
 
-fn zap_asteroids(pos: Vec2, asteroids: Vec<Vec2>) -> Vec<VisibleAsteroid> {
+fn zap_asteroids(pos: Vec2, asteroids: &Vec<Vec2>) -> Vec<VisibleAsteroid> {
     let mut visible_asteroids = Vec::new();
 
-    for other in &asteroids {
+    for other in asteroids {
         if !(pos.x == other.x && pos.y == other.y) {
             let pos_to_other = distance_between(&pos, other);
             let mut is_visible = true;
 
-            for occluding in &asteroids {
+            for occluding in asteroids {
                 if !(pos.x == occluding.x && pos.y == occluding.y)
                     && !(occluding.x == other.x && occluding.y == other.y)
                 {
@@ -71,13 +71,19 @@ fn zap_asteroids(pos: Vec2, asteroids: Vec<Vec2>) -> Vec<VisibleAsteroid> {
             }
 
             if is_visible {
-                let mut angle = ((other.x - pos.x) as f32).atan2(-(other.y - pos.y) as f32);
-                while angle < 0.0 {
-                    angle += std::f32::consts::PI;
+                let x = (other.x - pos.x) as f32;
+                let y = -(other.y - pos.y) as f32;
+                let atan_angle_pre = y.atan2(x);
+                let atan_angle_raw = 0.5 * std::f32::consts::PI - atan_angle_pre;
+                let mut atan_angle = atan_angle_raw;
+                while atan_angle < 0.0 {
+                    atan_angle += 2.0 * std::f32::consts::PI;
                 }
+
+                println!("pos: {:?}, other: {:?}, x: {}, y: {}, atan_angle_pre: {}, atan_angle_raw: {}, atan_angle: {}, ",pos,other, x,y,atan_angle_pre,atan_angle_raw,atan_angle);
                 visible_asteroids.push(VisibleAsteroid {
                     pos: other.clone(),
-                    angle: angle,
+                    angle: atan_angle,
                 })
             }
         }
@@ -89,11 +95,23 @@ fn zap_asteroids(pos: Vec2, asteroids: Vec<Vec2>) -> Vec<VisibleAsteroid> {
 }
 
 fn main() {
-    let input_text = ".#..#\n.....\n#####\n....#\n...##";
+    let input_text = "..#..###....#####....###........#\n.##.##...#.#.......#......##....#\n#..#..##.#..###...##....#......##\n..####...#..##...####.#.......#.#\n...#.#.....##...#.####.#.###.#..#\n#..#..##.#.#.####.#.###.#.##.....\n#.##...##.....##.#......#.....##.\n.#..##.##.#..#....#...#...#...##.\n.#..#.....###.#..##.###.##.......\n.##...#..#####.#.#......####.....\n..##.#.#.#.###..#...#.#..##.#....\n.....#....#....##.####....#......\n.#..##.#.........#..#......###..#\n#.##....#.#..#.#....#.###...#....\n.##...##..#.#.#...###..#.#.#..###\n.#..##..##...##...#.#.#...#..#.#.\n.#..#..##.##...###.##.#......#...\n...#.....###.....#....#..#....#..\n.#...###..#......#.##.#...#.####.\n....#.##...##.#...#........#.#...\n..#.##....#..#.......##.##.....#.\n.#.#....###.#.#.#.#.#............\n#....####.##....#..###.##.#.#..#.\n......##....#.#.#...#...#..#.....\n...#.#..####.##.#.........###..##\n.......#....#.##.......#.#.###...\n...#..#.#.........#...###......#.\n.#.##.#.#.#.#........#.#.##..#...\n.......#.##.#...........#..#.#...\n.####....##..#..##.#.##.##..##...\n.#.#..###.#..#...#....#.###.#..#.\n............#...#...#.......#.#..\n.........###.#.....#..##..#.##...";
+    // let input_text = ".#..##.###...#######\n##.############..##.\n.#.######.########.#\n.###.#######.####.#.\n#####.##.#.##.###.##\n..#####..#.#########\n####################\n#.####....###.#.#.##\n##.#################\n#####.##.###..####..\n..######..##.#######\n####.##.####...##..#\n.#####..#.######.###\n##...#.##########...\n#.##########.#######\n.####.#.###.###.#.##\n....##.##.###..#####\n.#.#.###########.###\n#.#.#.#####.####.###\n###.##.####.##.#..##";
     let mut asteroid_map = parse_map(input_text);
 
-    let zap_list = zap_asteroids(Vec2 { x: 3, y: 4 }, asteroid_map);
-    println!("{:?}", zap_list);
+    let mut zap_count = 0;
+    loop {
+        let zap_list = zap_asteroids(Vec2 { x: 27, y: 19 }, &asteroid_map);
+        for z in zap_list {
+            asteroid_map.retain(|x| x != &z.pos);
+            zap_count += 1;
+            println!("{}: {:?}", zap_count, z);
+            if zap_count == 200 {
+                println!("nr 200: {:?}", z.pos);
+                return;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
