@@ -550,7 +550,7 @@ fn main() {
                 }
             }
 
-            if counter % 10000 == 0 {
+            if counter % 100000 == 0 {
                 print_state(&state, old_states.len(), counter);
             }
             counter += 1;
