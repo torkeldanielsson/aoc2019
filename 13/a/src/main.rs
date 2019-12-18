@@ -369,19 +369,19 @@ fn print_state(state: &State) {
     clear();
     for pi in &state.map {
         mvaddch(
-            pi.pos.x,
             pi.pos.y,
+            pi.pos.x,
             match pi.material {
-                Material::Empty => ' ',
-                Material::Wall => '#',
-                Material::Block => '*',
-                Material::Paddle => '_',
-                Material::Ball => 'o',
+                Material::Empty => ' ' as u64,
+                Material::Wall => '#' as u64,
+                Material::Block => '*' as u64,
+                Material::Paddle => '_' as u64,
+                Material::Ball => 'o' as u64,
             },
         );
     }
 
-    mvaddstr(max.x, max.y, format!("{}", state.score));
+    mvaddstr(max.y, max.x, &format!("{}", state.score));
     refresh();
 }
 
@@ -401,7 +401,10 @@ fn main() {
         relative_base: 0,
     };
 
-    let mut state = State { map: Vec::new() };
+    let mut state = State {
+        map: Vec::new(),
+        score: 0,
+    };
 
     initscr();
     noecho();
@@ -412,10 +415,10 @@ fn main() {
         if program.return_state == ReturnState::NeedMoreInput {
             print_state(&state);
 
-            program.inputs.push(match getch() {
-                ' ' => 0,
-                'a' => 1,
-                's' => 2,
+            program.inputs.push(match getch() as u8 as char {
+                'a' => -1,
+                's' => 0,
+                'd' => 1,
                 _ => 0,
             });
         }
@@ -428,7 +431,7 @@ fn main() {
             let y = program.outputs[program.outputs.len() - 2];
 
             if x == -1 && y == 0 {
-                state.score = program.outputs[program.outputs.len() - 1];
+                state.score = program.outputs[program.outputs.len() - 1] as i32;
             } else {
                 let material = match program.outputs[program.outputs.len() - 1] {
                     0 => Material::Empty,
