@@ -1,8 +1,9 @@
 use ncurses::*;
+use rand::Rng;
 use std::env;
-use std::fs; // watch for globs
+use std::fs;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum Mode {
     Position,
     Immediate,
@@ -20,7 +21,7 @@ fn digit_to_mode(d: i32) -> Mode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum Opcode {
     Addition,
     Multiplication,
@@ -78,14 +79,14 @@ fn parse_op(n: usize) -> (Opcode, Mode, Mode, Mode) {
     )
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum ReturnState {
     NeedMoreInput,
     ProducedOutput,
     Break,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 struct ProgramState {
     program: Vec<i64>,
     return_state: ReturnState,
@@ -97,7 +98,11 @@ struct ProgramState {
 }
 
 fn run_program(s: &mut ProgramState) {
-    while s.pc < s.program.len() {
+    let mut counter = 0;
+
+    while s.pc < s.program.len() && counter < 1000000 {
+        counter += 1;
+
         let opcode = s.program[s.pc];
 
         // println!("s.pc {:?} opcode {:?}", s.pc, opcode);
@@ -300,6 +305,10 @@ fn run_program(s: &mut ProgramState) {
             }
         }
     }
+
+    if counter >= 1000000 {
+        s.return_state = ReturnState::Break;
+    }
 }
 
 fn parse_program(input: &str) -> Vec<i64> {
@@ -340,9 +349,14 @@ struct Location {
 struct State {
     map: Vec<Location>,
     score: i32,
+    program: ProgramState,
+    ball_x: i32,
+    paddle_x: i32,
+    ball_y: i32,
+    old_ball_y: i32,
 }
 
-fn print_state(state: &State) {
+fn print_state(state: &State, vec_len: usize, counter: i64) {
     let mut max = Vec2 {
         x: -999999,
         y: -9999999,
@@ -381,86 +395,191 @@ fn print_state(state: &State) {
         );
     }
 
-    mvaddstr(max.y, max.x, &format!("{}", state.score));
+    mvaddstr(max.y + 2, max.x, &format!("{}", state.score));
+    mvaddstr(max.y + 4, max.x, &format!("{}", vec_len));
+    mvaddstr(max.y + 6, max.x, &format!("{}", counter));
     refresh();
 }
 
+fn process_output(state: &mut State) -> bool {
+    let mut bounce_detected = false;
+
+    let x = state.program.outputs[state.program.outputs.len() - 3];
+    let y = state.program.outputs[state.program.outputs.len() - 2];
+
+    if x == -1 && y == 0 {
+        state.score = state.program.outputs[state.program.outputs.len() - 1] as i32;
+    } else {
+        let material = match state.program.outputs[state.program.outputs.len() - 1] {
+            0 => Material::Empty,
+            1 => Material::Wall,
+            2 => Material::Block,
+            3 => Material::Paddle,
+            4 => Material::Ball,
+            _ => panic!("unexpected"),
+        };
+
+        if material == Material::Ball {
+            if state.old_ball_y < state.ball_y && (y as i32) < state.ball_y {
+                bounce_detected = true;
+            }
+
+            state.ball_x = x as i32;
+            state.old_ball_y = state.ball_y;
+            state.ball_y = y as i32;
+        }
+
+        if material == Material::Paddle {
+            state.paddle_x = x as i32;
+        }
+
+        let mut found = false;
+        for mat in &mut state.map {
+            if mat.pos.x == x as i32 && mat.pos.y == y as i32 {
+                mat.material = material.clone();
+                found = true;
+            }
+        }
+        if !found {
+            state.map.push(Location {
+                pos: Vec2 {
+                    x: x as i32,
+                    y: y as i32,
+                },
+                material: material,
+            });
+        }
+    }
+
+    return bounce_detected;
+}
+
 fn main() {
+    let mut counter = 0;
+
+    let mut rng = rand::thread_rng();
+
     let args: Vec<String> = env::args().collect();
     let filename = &args[1];
 
     let input = fs::read_to_string(filename).expect("error reading file");
 
-    let mut program = ProgramState {
-        program: parse_program(&input),
-        return_state: ReturnState::ProducedOutput,
-        inputs: vec![],
-        outputs: vec![],
-        pc: 0,
-        input_counter: 0,
-        relative_base: 0,
-    };
-
     let mut state = State {
         map: Vec::new(),
         score: 0,
+        program: ProgramState {
+            program: parse_program(&input),
+            return_state: ReturnState::ProducedOutput,
+            inputs: vec![],
+            outputs: vec![],
+            pc: 0,
+            input_counter: 0,
+            relative_base: 0,
+        },
+        ball_x: 0,
+        paddle_x: 0,
+        ball_y: 0,
+        old_ball_y: 0,
     };
 
     initscr();
     noecho();
 
-    while program.return_state != ReturnState::Break {
-        run_program(&mut program);
+    let mut old_states: Vec<State> = Vec::new();
 
-        if program.return_state == ReturnState::NeedMoreInput {
-            print_state(&state);
+    while state.program.return_state != ReturnState::Break
+        && state.program.return_state != ReturnState::NeedMoreInput
+    {
+        run_program(&mut state.program);
 
-            program.inputs.push(match getch() as u8 as char {
-                'a' => -1,
-                's' => 0,
-                'd' => 1,
-                _ => 0,
-            });
-        }
-
-        if program.return_state == ReturnState::ProducedOutput
-            && program.outputs.len() % 3 == 0
-            && program.outputs.len() != 0
+        if state.program.return_state == ReturnState::ProducedOutput
+            && state.program.outputs.len() % 3 == 0
+            && state.program.outputs.len() != 0
         {
-            let x = program.outputs[program.outputs.len() - 3];
-            let y = program.outputs[program.outputs.len() - 2];
-
-            if x == -1 && y == 0 {
-                state.score = program.outputs[program.outputs.len() - 1] as i32;
-            } else {
-                let material = match program.outputs[program.outputs.len() - 1] {
-                    0 => Material::Empty,
-                    1 => Material::Wall,
-                    2 => Material::Block,
-                    3 => Material::Paddle,
-                    4 => Material::Ball,
-                    _ => panic!("unexpected"),
-                };
-
-                let mut found = false;
-                for mat in &mut state.map {
-                    if mat.pos.x == x as i32 && mat.pos.y == y as i32 {
-                        mat.material = material.clone();
-                        found = true;
-                    }
-                }
-                if !found {
-                    state.map.push(Location {
-                        pos: Vec2 {
-                            x: x as i32,
-                            y: y as i32,
-                        },
-                        material: material,
-                    });
-                }
-            }
+            process_output(&mut state);
         }
     }
+
+    print_state(&state, old_states.len(), 0);
+
+    old_states.push(state.clone());
+
+    loop {
+        while state.program.return_state != ReturnState::Break {
+            run_program(&mut state.program);
+
+            if state.program.return_state == ReturnState::NeedMoreInput {
+                let r = rng.gen_range(0, 20);
+                if r < 10 {
+                    state.program.inputs.push(rng.gen_range(-1, 2));
+                } else if r < 13 {
+                    state.program.inputs.push(-1);
+                    state.program.inputs.push(-1);
+                    state.program.inputs.push(-1);
+                    state.program.inputs.push(-1);
+                } else if r < 16 {
+                    state.program.inputs.push(1);
+                    state.program.inputs.push(1);
+                    state.program.inputs.push(1);
+                    state.program.inputs.push(1);
+                } else {
+                    if state.ball_x < state.paddle_x {
+                        state.program.inputs.push(-1);
+                        state.program.inputs.push(-1);
+                        state.program.inputs.push(-1);
+                        state.program.inputs.push(-1);
+                        state.program.inputs.push(-1);
+                    } else {
+                        state.program.inputs.push(1);
+                        state.program.inputs.push(1);
+                        state.program.inputs.push(1);
+                        state.program.inputs.push(1);
+                        state.program.inputs.push(1);
+                    }
+                }
+            }
+
+            if state.program.return_state == ReturnState::ProducedOutput
+                && state.program.outputs.len() % 3 == 0
+                && state.program.outputs.len() != 0
+            {
+                if process_output(&mut state) {
+                    print_state(&state, old_states.len(), counter);
+                    old_states.push(state.clone());
+                    break;
+                }
+            }
+
+            if counter % 10000 == 0 {
+                print_state(&state, old_states.len(), counter);
+            }
+            counter += 1;
+        }
+
+        if state.program.return_state == ReturnState::Break {
+            state = old_states.last().unwrap().clone();
+
+            if state.score < 18000 {
+                if old_states.len() > 1 && rng.gen_range(-15, 2) > 0 {
+                    old_states.pop();
+                }
+                if old_states.len() > 20 && rng.gen_range(-500, 2) > 0 {
+                    old_states.pop();
+                    old_states.pop();
+                    old_states.pop();
+                    old_states.pop();
+                    old_states.pop();
+                    old_states.pop();
+                }
+            }
+
+            state = old_states.last().unwrap().clone();
+        }
+    }
+
+    print_state(&state, old_states.len(), 0);
+
+    getch();
 
     endwin();
 }
