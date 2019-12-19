@@ -3,7 +3,7 @@ use rand::Rng;
 #[derive(Debug, PartialEq, Clone)]
 struct Produce {
     id: String,
-    num: i32,
+    num: i64,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -21,7 +21,7 @@ fn parse_produce(input: &str) -> Produce {
 
     return Produce {
         id: parts[1].to_string(),
-        num: parts[0].parse::<i32>().unwrap(),
+        num: parts[0].parse::<i64>().unwrap(),
     };
 }
 
@@ -56,7 +56,7 @@ fn parse_input_to_rule_list(input: &str) -> Vec<Rule> {
     return res;
 }
 
-fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
+fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i64 {
     let mut rng = rand::thread_rng();
 
     let mut surplus: Vec<Produce> = Vec::new();
@@ -91,6 +91,9 @@ fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
                     for rule in rules {
                         if rule.output.id == req.id {
                             let mut multiplier = 1;
+                            if rule.output.num < req.num {
+                                multiplier = req.num / rule.output.num;
+                            }
                             while multiplier * rule.output.num < req.num {
                                 multiplier += 1;
                             }
@@ -98,10 +101,26 @@ fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
                                 more_to_change = true;
                                 changed = true;
                                 for input in &rule.input {
-                                    required.push(Produce {
-                                        id: input.id.clone(),
-                                        num: input.num * multiplier,
-                                    });
+                                    let mut amount_needed = input.num * multiplier;
+
+                                    for surp in &mut surplus {
+                                        if surp.id == input.id {
+                                            if amount_needed >= surp.num {
+                                                amount_needed -= surp.num;
+                                                surp.num = 0;
+                                            } else {
+                                                surp.num -= amount_needed;
+                                                amount_needed = 0;
+                                            }
+                                        }
+                                    }
+
+                                    if amount_needed != 0 {
+                                        required.push(Produce {
+                                            id: input.id.clone(),
+                                            num: amount_needed,
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -210,26 +229,19 @@ fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
     }
 }
 
-fn get_ore_count(rules: &Vec<Rule>) -> i32 {
+fn get_ore_count(rules: &Vec<Rule>, count: i64) -> i64 {
     let mut required: Vec<Produce> = Vec::new();
 
     for rule in rules {
         if rule.output.id == "FUEL" {
             required = rule.input.clone();
+            for r in &mut required {
+                r.num *= count;
+            }
         }
     }
 
-    let mut lowest_res = std::i32::MAX;
-
-    for _ in 0..1000000000 {
-        let r = recursive_exchanger(rules, required.clone());
-        if lowest_res > r {
-            lowest_res = r;
-            println!("lowest: {}", lowest_res);
-        }
-    }
-
-    return lowest_res;
+    return recursive_exchanger(rules, required.clone());
 }
 
 fn main() {
@@ -242,11 +254,22 @@ fn main() {
 
     let rules = parse_input_to_rule_list(input_text);
 
-    // println!("{:?}", rules);
+    // println!("a: {:?}", get_ore_count(&rules, 1));
 
-    let ore_count = get_ore_count(&rules);
+    let mut done = false;
+    let mut guess = 1184210;
+    while !done {
+        let ore_count = get_ore_count(&rules, guess);
 
-    println!("{:?}", ore_count);
+        let old_guess = guess;
+
+        guess = ((1000000000000.0 / (ore_count as f64)) * (guess as f64)) as i64;
+
+        println!(
+            "ore_count: {}, guess: {}, new guess: {}",
+            ore_count, old_guess, guess
+        );
+    }
 }
 
 #[cfg(test)]
