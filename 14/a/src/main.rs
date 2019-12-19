@@ -254,8 +254,8 @@ fn main() {
 
     let rules = parse_input_to_rule_list(input_text);
 
-    // println!("a: {:?}", get_ore_count(&rules, 1));
-
+    println!("a: {:?}", get_ore_count(&rules, 1));
+    /*
     let mut done = false;
     let mut guess = 1184210;
     while !done {
@@ -269,7 +269,7 @@ fn main() {
             "ore_count: {}, guess: {}, new guess: {}",
             ore_count, old_guess, guess
         );
-    }
+    }*/
 }
 
 #[cfg(test)]
