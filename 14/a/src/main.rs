@@ -59,6 +59,8 @@ fn parse_input_to_rule_list(input: &str) -> Vec<Rule> {
 fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
     let mut rng = rand::thread_rng();
 
+    let mut surplus: Vec<Produce> = Vec::new();
+
     loop {
         let mut only_ore_left = true;
         for req in &required {
@@ -160,11 +162,35 @@ fn recursive_exchanger(rules: &Vec<Rule>, mut required: Vec<Produce>) -> i32 {
                                     while multiplier * rule.output.num < req.num {
                                         multiplier += 1;
                                     }
-                                    for input in &rule.input {
-                                        required.push(Produce {
-                                            id: input.id.clone(),
-                                            num: input.num * multiplier,
+
+                                    if multiplier * rule.output.num != req.num {
+                                        surplus.push(Produce {
+                                            id: rule.output.id.clone(),
+                                            num: multiplier * rule.output.num - req.num,
                                         });
+                                    }
+
+                                    for input in &rule.input {
+                                        let mut amount_needed = input.num * multiplier;
+
+                                        for surp in &mut surplus {
+                                            if surp.id == input.id {
+                                                if amount_needed >= surp.num {
+                                                    amount_needed -= surp.num;
+                                                    surp.num = 0;
+                                                } else {
+                                                    surp.num -= amount_needed;
+                                                    amount_needed = 0;
+                                                }
+                                            }
+                                        }
+
+                                        if amount_needed != 0 {
+                                            required.push(Produce {
+                                                id: input.id.clone(),
+                                                num: amount_needed,
+                                            });
+                                        }
                                     }
                                 }
                             }
