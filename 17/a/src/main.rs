@@ -384,6 +384,28 @@ fn print_map(map: &Vec<Vec<Material>>, robot_pos: &Vec2) {
     }
 }
 
+fn get_move_str(movements: &Vec<Movement>) -> String {
+    let mut move_str = String::new();
+
+    for m in movements {
+        if m.move_type == MoveType::Move {
+            move_str = format!("{}{}", move_str, m.dist);
+        } else {
+            move_str = format!(
+                "{}{}",
+                move_str,
+                match m.move_type {
+                    MoveType::TurnLeft => "L",
+                    MoveType::TurnRight => "R",
+                    _ => panic!("cant happen"),
+                }
+            );
+        }
+        move_str = format!("{},", move_str);
+    }
+    move_str
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = &args[1];
@@ -682,47 +704,220 @@ fn main() {
             relative_base: 0,
         };
 
-        let mut move_strs: Vec<String> = Vec::new();
-        {
-            let mut move_str = String::new();
+        let mut movements_res_order = String::new();
+        let mut movements_res_a: Vec<Movement> = Vec::new();
+        let mut movements_res_b: Vec<Movement> = Vec::new();
+        let mut movements_res_c: Vec<Movement> = Vec::new();
 
-            for m in &movements {
-                if m.move_type == MoveType::Move {
-                    move_str = format!("{}{}", move_str, m.dist);
-                } else {
-                    move_str = format!(
-                        "{}{}",
-                        move_str,
-                        match m.move_type {
-                            MoveType::TurnLeft => "L",
-                            MoveType::TurnRight => "R",
-                            _ => panic!("cant happen"),
+        'outer: for a_len in 2..10 {
+            let mut movements_tmp_a = movements.clone();
+
+            let movement_a: Vec<Movement> = movements_tmp_a[0..a_len].to_owned();
+            movements_tmp_a = movements_tmp_a[a_len..].to_owned();
+
+            let mut order_str_a = "A".to_string();
+            {
+                let mut found_match = true;
+                while found_match {
+                    found_match = false;
+
+                    if movements_tmp_a.len() >= a_len {
+                        let mut got_match = true;
+                        for i in 0..a_len {
+                            if movements_tmp_a[i] != movement_a[i] {
+                                got_match = false;
+                            }
                         }
-                    );
+                        if got_match {
+                            found_match = true;
+                            order_str_a.push_str(",A");
+                            movements_tmp_a = movements_tmp_a[a_len..].to_owned();
+                        }
+                    }
                 }
-                if move_str.len() > 17 {
-                    move_str = format!("{}\n", move_str);
-                    move_strs.push(move_str);
-                    move_str = String::new();
-                } else {
-                    move_str = format!("{},", move_str);
+            }
+
+            for b_len in 2..10 {
+                let mut movements_tmp_b = movements_tmp_a.clone();
+
+                let movement_b: Vec<Movement> = movements_tmp_b[0..b_len].to_owned();
+                movements_tmp_b = movements_tmp_b[b_len..].to_owned();
+
+                let mut order_str_b = order_str_a.clone();
+                order_str_b.push_str(",B");
+
+                {
+                    let mut found_match = true;
+                    while found_match {
+                        found_match = false;
+
+                        if movements_tmp_b.len() >= a_len {
+                            let mut got_match = true;
+                            for i in 0..a_len {
+                                if movements_tmp_b[i] != movement_a[i] {
+                                    got_match = false;
+                                }
+                            }
+                            if got_match {
+                                found_match = true;
+                                order_str_b.push_str(",A");
+                                movements_tmp_b = movements_tmp_b[a_len..].to_owned();
+                            }
+                        }
+
+                        if movements_tmp_b.len() >= b_len {
+                            let mut got_match = true;
+                            for i in 0..b_len {
+                                if movements_tmp_b[i] != movement_b[i] {
+                                    got_match = false;
+                                }
+                            }
+                            if got_match {
+                                found_match = true;
+                                order_str_b.push_str(",B");
+                                movements_tmp_b = movements_tmp_b[b_len..].to_owned();
+                            }
+                        }
+                    }
+                }
+
+                for c_len in 2..10 {
+                    let mut movements_tmp_c = movements_tmp_b.clone();
+
+                    let movement_c: Vec<Movement> = movements_tmp_c[0..c_len].to_owned();
+                    movements_tmp_c = movements_tmp_c[c_len..].to_owned();
+
+                    let mut order_str_c = order_str_b.clone();
+                    order_str_c.push_str(",C");
+                    {
+                        let mut found_match = true;
+                        while found_match {
+                            found_match = false;
+
+                            if movements_tmp_c.len() >= a_len {
+                                let mut got_match = true;
+                                for i in 0..a_len {
+                                    if movements_tmp_c[i] != movement_a[i] {
+                                        got_match = false;
+                                    }
+                                }
+                                if got_match {
+                                    found_match = true;
+                                    order_str_c.push_str(",A");
+                                    movements_tmp_c = movements_tmp_c[a_len..].to_owned();
+                                }
+                            }
+
+                            if movements_tmp_c.len() >= b_len {
+                                let mut got_match = true;
+                                for i in 0..b_len {
+                                    if movements_tmp_c[i] != movement_b[i] {
+                                        got_match = false;
+                                    }
+                                }
+                                if got_match {
+                                    found_match = true;
+                                    order_str_c.push_str(",B");
+                                    movements_tmp_c = movements_tmp_c[b_len..].to_owned();
+                                }
+                            }
+
+                            if movements_tmp_c.len() >= c_len {
+                                let mut got_match = true;
+                                for i in 0..c_len {
+                                    if movements_tmp_c[i] != movement_c[i] {
+                                        got_match = false;
+                                    }
+                                }
+                                if got_match {
+                                    found_match = true;
+                                    order_str_c.push_str(",C");
+                                    movements_tmp_c = movements_tmp_c[c_len..].to_owned();
+                                }
+                            }
+                        }
+                    }
+
+                    if order_str_c != "A,B,C" {
+                        println!(
+                            "{}, {} {} {}",
+                            order_str_c,
+                            get_move_str(&movement_a),
+                            get_move_str(&movement_b),
+                            get_move_str(&movement_c)
+                        );
+                    }
+
+                    if movements_tmp_c.len() == 0 {
+                        movements_res_order = order_str_c;
+                        movements_res_a = movement_a.clone();
+                        movements_res_b = movement_b.clone();
+                        movements_res_c = movement_c.clone();
+
+                        println!("SUCCESS!");
+                        break 'outer;
+                    }
                 }
             }
         }
 
-        println!("{:?}", move_strs);
+        let mut movement_str_a = get_move_str(&movements_res_a);
+        let mut movement_str_b = get_move_str(&movements_res_b);
+        let mut movement_str_c = get_move_str(&movements_res_c);
 
-        for n in "A,B,C\n".chars().map(|c| c as i64) {
+        println!("");
+
+        println!("{}", get_move_str(&movements));
+        {
+            let mut reconstructed_move_str = String::new();
+            let somethignasdf: Vec<String> = movements_res_order
+                .split(",")
+                .map(|s| s.to_string())
+                .collect();
+            for p in somethignasdf.join("").chars() {
+                match p {
+                    'A' => reconstructed_move_str.push_str(&movement_str_a),
+                    'B' => reconstructed_move_str.push_str(&movement_str_b),
+                    'C' => reconstructed_move_str.push_str(&movement_str_c),
+                    _ => {}
+                }
+                reconstructed_move_str.pop();
+                reconstructed_move_str.push_str("#");
+            }
+            println!("{}", reconstructed_move_str);
+        }
+
+        movement_str_a.pop();
+        movement_str_b.pop();
+        movement_str_c.pop();
+
+        movements_res_order.push_str("\n");
+        movement_str_a.push_str("\n");
+        movement_str_b.push_str("\n");
+        movement_str_c.push_str("\n");
+
+        println!(
+            "{:?}, {:?} {:?} {:?}",
+            movements_res_order, movement_str_a, movement_str_b, movement_str_c
+        );
+
+        for n in movements_res_order.chars().map(|c| c as i64) {
             state.program.inputs.push(n);
         }
 
-        for i in 0..3 {
-            for n in move_strs[i].chars().map(|c| c as i64) {
-                state.program.inputs.push(n);
-            }
+        for n in movement_str_a.chars().map(|c| c as i64) {
+            state.program.inputs.push(n);
         }
 
-        for n in "y\n".chars().map(|c| c as i64) {
+        for n in movement_str_b.chars().map(|c| c as i64) {
+            state.program.inputs.push(n);
+        }
+
+        for n in movement_str_c.chars().map(|c| c as i64) {
+            state.program.inputs.push(n);
+        }
+
+        for n in "n\n".chars().map(|c| c as i64) {
             state.program.inputs.push(n);
         }
 
@@ -753,5 +948,10 @@ fn main() {
                 state.program.outputs = vec![];
             }
         }
+
+        println!(
+            "last output value: {}",
+            state.program.outputs.last().unwrap()
+        );
     }
 }
