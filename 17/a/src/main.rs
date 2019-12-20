@@ -480,8 +480,8 @@ fn main() {
         println!("p1: {}", p1_res);
     }
 
+    let mut movements: Vec<Movement> = Vec::new();
     {
-        let mut movements: Vec<Movement> = Vec::new();
         movements.push(Movement {
             move_type: MoveType::TurnLeft,
             dist: 0,
@@ -492,8 +492,8 @@ fn main() {
         while !done {
             let mut accumulated_moves = 0;
             let (dx, dy) = match state.robot_dir {
-                Direction::Up => (0, 1),
-                Direction::Down => (0, -1),
+                Direction::Up => (0, -1),
+                Direction::Down => (0, 1),
                 Direction::Left => (-1, 0),
                 Direction::Right => (1, 0),
             };
@@ -521,9 +521,9 @@ fn main() {
             });
 
             let up =
-                state.map[(state.robot_pos.y + 1) as usize][(state.robot_pos.x) as usize].clone();
-            let down =
                 state.map[(state.robot_pos.y - 1) as usize][(state.robot_pos.x) as usize].clone();
+            let down =
+                state.map[(state.robot_pos.y + 1) as usize][(state.robot_pos.x) as usize].clone();
             let left =
                 state.map[(state.robot_pos.y) as usize][(state.robot_pos.x - 1) as usize].clone();
             let right =
@@ -665,5 +665,93 @@ fn main() {
             }
         }
         println!("");
+    }
+
+    {
+        let filename_2 = &args[2];
+
+        let input_2 = fs::read_to_string(filename_2).expect("error reading file");
+
+        state.program = ProgramState {
+            program: parse_program(&input_2),
+            return_state: ReturnState::ProducedOutput,
+            inputs: vec![],
+            outputs: vec![],
+            pc: 0,
+            input_counter: 0,
+            relative_base: 0,
+        };
+
+        let mut move_strs: Vec<String> = Vec::new();
+        {
+            let mut move_str = String::new();
+
+            for m in &movements {
+                if m.move_type == MoveType::Move {
+                    move_str = format!("{}{}", move_str, m.dist);
+                } else {
+                    move_str = format!(
+                        "{}{}",
+                        move_str,
+                        match m.move_type {
+                            MoveType::TurnLeft => "L",
+                            MoveType::TurnRight => "R",
+                            _ => panic!("cant happen"),
+                        }
+                    );
+                }
+                if move_str.len() > 17 {
+                    move_str = format!("{}\n", move_str);
+                    move_strs.push(move_str);
+                    move_str = String::new();
+                } else {
+                    move_str = format!("{},", move_str);
+                }
+            }
+        }
+
+        println!("{:?}", move_strs);
+
+        for n in "A,B,C\n".chars().map(|c| c as i64) {
+            state.program.inputs.push(n);
+        }
+
+        for i in 0..3 {
+            for n in move_strs[i].chars().map(|c| c as i64) {
+                state.program.inputs.push(n);
+            }
+        }
+
+        for n in "y\n".chars().map(|c| c as i64) {
+            state.program.inputs.push(n);
+        }
+
+        loop {
+            run_program(&mut state.program);
+
+            if state.program.return_state != ReturnState::ProducedOutput {
+                break;
+            }
+
+            if state.program.outputs.len() > 0 && *state.program.outputs.last().unwrap() == 10 {
+                let output_as_string = state
+                    .program
+                    .outputs
+                    .iter()
+                    .map(|n| ((*n as u8) as char))
+                    .collect::<String>();
+                let output_lines: Vec<String> = output_as_string
+                    .lines()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_owned())
+                    .collect();
+
+                for line in output_lines {
+                    println!("{}", line);
+                }
+
+                state.program.outputs = vec![];
+            }
+        }
     }
 }
