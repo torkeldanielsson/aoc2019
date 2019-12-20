@@ -1,5 +1,3 @@
-use ncurses::*;
-use rand::Rng;
 use std::env;
 use std::fs;
 
@@ -325,8 +323,17 @@ fn parse_program(input: &str) -> Vec<i64> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct State {
-    program: ProgramState,
+struct Vec2 {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -334,6 +341,47 @@ enum Material {
     Empty,
     Scaffold,
     Robot,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct State {
+    program: ProgramState,
+    robot_pos: Vec2,
+    robot_dir: Direction,
+    map: Vec<Vec<Material>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum MoveType {
+    Move,
+    TurnLeft,
+    TurnRight,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct Movement {
+    move_type: MoveType,
+    dist: i32,
+}
+
+fn print_map(map: &Vec<Vec<Material>>, robot_pos: &Vec2) {
+    for y in 0..map.len() {
+        for x in 0..map.last().unwrap().len() {
+            if robot_pos.x == x as i32 && robot_pos.y == y as i32 {
+                print!("O");
+            } else {
+                print!(
+                    "{}",
+                    match map[y][x] {
+                        Material::Empty => ' ',
+                        Material::Scaffold => '#',
+                        Material::Robot => 'O',
+                    }
+                );
+            }
+        }
+        println!("");
+    }
 }
 
 fn main() {
@@ -352,6 +400,9 @@ fn main() {
             input_counter: 0,
             relative_base: 0,
         },
+        robot_pos: Vec2 { x: 0, y: 0 },
+        robot_dir: Direction::Up,
+        map: Vec::new(),
     };
 
     while state.program.return_state == ReturnState::ProducedOutput {
@@ -370,9 +421,10 @@ fn main() {
         .map(|s| s.to_owned())
         .collect();
 
-    let mut map: Vec<Vec<Material>> = Vec::new();
     for line in output_lines {
         let mut arr: Vec<Material> = Vec::new();
+
+        arr.push(Material::Empty);
 
         for c in line.chars() {
             arr.push(match c {
@@ -381,15 +433,26 @@ fn main() {
                 _ => Material::Robot,
             });
         }
-        map.push(arr);
+
+        if state.map.len() == 0 {
+            state.map.push(vec![Material::Empty; arr.len()]);
+        }
+
+        state.map.push(arr);
     }
+    state
+        .map
+        .push(vec![Material::Empty; state.map.last().unwrap().len()]);
 
     {
         let mut robot_count = 0;
-        for y in 0..map.len() {
-            for x in 0..map.last().unwrap().len() {
-                if map[y][x] == Material::Robot {
+        for y in 0..state.map.len() {
+            for x in 0..state.map.last().unwrap().len() {
+                if state.map[y][x] == Material::Robot {
                     robot_count += 1;
+                    state.robot_pos.x = x as i32;
+                    state.robot_pos.y = y as i32;
+                    state.map[y][x] = Material::Scaffold;
                 }
             }
         }
@@ -398,34 +461,209 @@ fn main() {
         }
     }
 
-    for y in 0..map.len() {
-        for x in 0..map.last().unwrap().len() {
-            print!(
-                "{}",
-                match map[y][x] {
-                    Material::Empty => ' ',
-                    Material::Scaffold => '#',
-                    Material::Robot => 'O',
-                }
-            );
-        }
-        println!("");
-    }
+    print_map(&state.map, &state.robot_pos);
 
     {
         let mut p1_res = 0;
-        for y in 1..map.len() - 1 {
-            for x in 1..map.last().unwrap().len() - 1 {
-                if map[y][x] == Material::Scaffold
-                    && map[y + 1][x] == Material::Scaffold
-                    && map[y][x + 1] == Material::Scaffold
-                    && map[y - 1][x] == Material::Scaffold
-                    && map[y][x - 1] == Material::Scaffold
+        for y in 1..state.map.len() - 1 {
+            for x in 1..state.map.last().unwrap().len() - 1 {
+                if state.map[y][x] == Material::Scaffold
+                    && state.map[y + 1][x] == Material::Scaffold
+                    && state.map[y][x + 1] == Material::Scaffold
+                    && state.map[y - 1][x] == Material::Scaffold
+                    && state.map[y][x - 1] == Material::Scaffold
                 {
                     p1_res += x * y;
                 }
             }
         }
         println!("p1: {}", p1_res);
+    }
+
+    {
+        let mut movements: Vec<Movement> = Vec::new();
+        movements.push(Movement {
+            move_type: MoveType::TurnLeft,
+            dist: 0,
+        });
+        state.robot_dir = Direction::Left;
+
+        let mut done = false;
+        while !done {
+            let mut accumulated_moves = 0;
+            let (dx, dy) = match state.robot_dir {
+                Direction::Up => (0, 1),
+                Direction::Down => (0, -1),
+                Direction::Left => (-1, 0),
+                Direction::Right => (1, 0),
+            };
+
+            while state.map[(state.robot_pos.y + dy) as usize][(state.robot_pos.x + dx) as usize]
+                == Material::Scaffold
+            {
+                accumulated_moves += 1;
+                state.robot_pos.x += dx;
+                state.robot_pos.y += dy;
+
+                println!(
+                    "state.robot_pos: {:?}, {}, {}, {}, {}",
+                    state.robot_pos,
+                    (state.robot_pos.y + dy),
+                    (state.robot_pos.y + dy) as usize,
+                    (state.robot_pos.x + dx),
+                    (state.robot_pos.x + dx) as usize
+                );
+                print_map(&state.map, &state.robot_pos);
+            }
+            movements.push(Movement {
+                move_type: MoveType::Move,
+                dist: accumulated_moves,
+            });
+
+            let up =
+                state.map[(state.robot_pos.y + 1) as usize][(state.robot_pos.x) as usize].clone();
+            let down =
+                state.map[(state.robot_pos.y - 1) as usize][(state.robot_pos.x) as usize].clone();
+            let left =
+                state.map[(state.robot_pos.y) as usize][(state.robot_pos.x - 1) as usize].clone();
+            let right =
+                state.map[(state.robot_pos.y) as usize][(state.robot_pos.x + 1) as usize].clone();
+
+            match (&up, &down, &left, &right) {
+                (Material::Scaffold, Material::Empty, Material::Empty, Material::Empty)
+                | (Material::Empty, Material::Scaffold, Material::Empty, Material::Empty)
+                | (Material::Empty, Material::Empty, Material::Scaffold, Material::Empty)
+                | (Material::Empty, Material::Empty, Material::Empty, Material::Scaffold) => {
+                    done = true;
+                }
+                _ => {}
+            }
+
+            if !done {
+                match (&state.robot_dir, &up, &down, &left, &right) {
+                    (
+                        Direction::Up,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Scaffold,
+                        Material::Empty,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnLeft,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Left;
+                    }
+                    (
+                        Direction::Up,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Scaffold,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnRight,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Right;
+                    }
+                    (
+                        Direction::Down,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Empty,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnRight,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Left;
+                    }
+                    (
+                        Direction::Down,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Empty,
+                        Material::Scaffold,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnLeft,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Right;
+                    }
+                    (
+                        Direction::Left,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Empty,
+                        Material::Scaffold,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnRight,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Up;
+                    }
+                    (
+                        Direction::Left,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Scaffold,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnLeft,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Down;
+                    }
+                    (
+                        Direction::Right,
+                        Material::Scaffold,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Empty,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnLeft,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Up;
+                    }
+                    (
+                        Direction::Right,
+                        Material::Empty,
+                        Material::Scaffold,
+                        Material::Scaffold,
+                        Material::Empty,
+                    ) => {
+                        movements.push(Movement {
+                            move_type: MoveType::TurnRight,
+                            dist: 0,
+                        });
+                        state.robot_dir = Direction::Down;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for m in &movements {
+            if m.move_type == MoveType::Move {
+                print!("{},", m.dist);
+            } else {
+                print!(
+                    "{},",
+                    match m.move_type {
+                        MoveType::TurnLeft => "L",
+                        MoveType::TurnRight => "R",
+                        _ => panic!("cant happen"),
+                    }
+                );
+            }
+        }
+        println!("");
     }
 }
