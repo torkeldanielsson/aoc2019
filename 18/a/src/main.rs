@@ -1,3 +1,5 @@
+use rand::seq::SliceRandom;
+
 #[derive(Debug, PartialEq, Clone)]
 struct Loc {
     val: char,
@@ -69,6 +71,15 @@ fn recursive_search(
 
     recursive_fill(&mut map, cur_x, cur_y, &keys_and_doors, *lowest_res);
 
+    struct PossiblePath {
+        x: usize,
+        y: usize,
+        keys_and_doors: Vec<char>,
+        steps: i32,
+    }
+
+    let mut possible_paths: Vec<PossiblePath> = Vec::new();
+
     for y in 1..map.len() - 1 {
         for x in 1..map[y].len() - 1 {
             if !keys_and_doors.contains(&map[y][x].val)
@@ -88,21 +99,34 @@ fn recursive_search(
                         modified_keys_and_doors.push(map[y][x].val);
                         modified_keys_and_doors.push((map[y][x].val as u8 - 32) as char);
 
-                        let recursive_res = recursive_search(
-                            map.clone(),
-                            x,
-                            y,
-                            modified_keys_and_doors,
-                            d2 + 1,
-                            lowest_res,
-                        );
-                        if recursive_res < *lowest_res {
-                            *lowest_res = recursive_res;
-                            println!("lowest_res: {}", *lowest_res);
-                        }
+                        possible_paths.push(PossiblePath {
+                            x: x,
+                            y: y,
+                            keys_and_doors: modified_keys_and_doors,
+                            steps: d2 + 1,
+                        });
                     }
                 }
             }
+        }
+    }
+
+    let mut rng = rand::thread_rng();
+
+    possible_paths.shuffle(&mut rng);
+
+    for possible_path in possible_paths {
+        let recursive_res = recursive_search(
+            map.clone(),
+            possible_path.x,
+            possible_path.y,
+            possible_path.keys_and_doors,
+            possible_path.steps,
+            lowest_res,
+        );
+        if recursive_res < *lowest_res {
+            *lowest_res = recursive_res;
+            println!("lowest_res: {}", *lowest_res);
         }
     }
 
