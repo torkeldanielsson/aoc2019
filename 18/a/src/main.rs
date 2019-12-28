@@ -1,5 +1,3 @@
-use rand::seq::SliceRandom;
-
 #[derive(Debug, PartialEq, Clone)]
 struct Loc {
     val: char,
@@ -71,6 +69,7 @@ fn recursive_search(
 
     recursive_fill(&mut map, cur_x, cur_y, &keys_and_doors, *lowest_res);
 
+    #[derive(Debug, PartialEq, Clone)]
     struct PossiblePath {
         x: usize,
         y: usize,
@@ -111,9 +110,9 @@ fn recursive_search(
         }
     }
 
-    let mut rng = rand::thread_rng();
+    possible_paths.sort_by(|a, b| a.steps.cmp(&b.steps));
 
-    possible_paths.shuffle(&mut rng);
+    // println!("{:?}", possible_paths);
 
     for possible_path in possible_paths {
         let recursive_res = recursive_search(
