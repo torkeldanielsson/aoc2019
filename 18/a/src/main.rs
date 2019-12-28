@@ -1,23 +1,23 @@
+use std::collections::HashSet;
+
 #[derive(Debug, PartialEq, Clone)]
 struct Loc {
     val: char,
     dist: i32,
 }
 
-fn recursive_fill(
-    map: &mut Vec<Vec<Loc>>,
-    cur_x: usize,
-    cur_y: usize,
-    keys_and_doors: &Vec<char>,
-    lowest_res: i32,
-) {
+#[derive(Eq, PartialEq, Debug)]
+struct VisitedState {
+    keys: HashSet<char>,
+    pos: char,
+    steps_in: i32,
+    steps_to_finish: i32,
+}
+
+fn recursive_fill(map: &mut Vec<Vec<Loc>>, cur_x: usize, cur_y: usize, keys: &HashSet<char>) {
     let offsets: Vec<(i32, i32)> = vec![(1, 0), (-1, 0), (0, -1), (0, 1)];
 
     let d = map[cur_y][cur_x].dist;
-
-    if d > lowest_res {
-        return;
-    }
 
     for (dx, dy) in &offsets {
         let iy = ((cur_y as i32) + dy) as usize;
@@ -25,55 +25,72 @@ fn recursive_fill(
 
         let d2 = map[iy][ix].dist;
 
-        if (map[iy][ix].val == '.' || keys_and_doors.contains(&map[iy][ix].val))
-            && (d2 == -1 || d2 > d + 1)
+        if (d2 == -1 || d2 > d + 1)
+            && (map[iy][ix].val == '.'
+                || keys.contains(&map[iy][ix].val)
+                || ((map[iy][ix].val as u8 >= 'A' as u8 && map[iy][ix].val as u8 <= 'Z' as u8)
+                    && keys.contains(&((map[iy][ix].val as u8 + 32) as char))))
         {
             map[iy][ix].dist = d + 1;
-            recursive_fill(map, ix, iy, keys_and_doors, lowest_res);
+            recursive_fill(map, ix, iy, keys);
         }
     }
 }
 
 fn recursive_search(
-    mut map: Vec<Vec<Loc>>,
+    map: &mut Vec<Vec<Loc>>,
     cur_x: usize,
     cur_y: usize,
-    keys_and_doors: Vec<char>,
-    steps: i32,
-    lowest_res: &mut i32,
+    keys: HashSet<char>,
+    steps_in: i32,
+    visited_states: &mut Vec<VisitedState>,
+    lowest_res_tmp: &mut i32,
 ) -> i32 {
+    for visited_state in &mut visited_states.iter() {
+        let diff_1: HashSet<_> = keys.difference(&visited_state.keys).collect();
+        let diff_2: HashSet<_> = visited_state.keys.difference(&keys).collect();
+        if diff_1.len() == 0 && diff_2.len() == 0 && visited_state.pos == map[cur_y][cur_x].val {
+            return visited_state.steps_to_finish;
+        }
+    }
+
     let offsets: Vec<(i32, i32)> = vec![(1, 0), (-1, 0), (0, -1), (0, 1)];
 
     let mut all_done = true;
-    for y in 1..map.len() - 1 {
+    'outer: for y in 1..map.len() - 1 {
         for x in 1..map[y].len() - 1 {
-            if !keys_and_doors.contains(&map[y][x].val)
-                && ((map[y][x].val as u8 >= 'a' as u8 && map[y][x].val as u8 <= 'z' as u8)
-                    || (map[y][x].val as u8 >= 'A' as u8 && map[y][x].val as u8 <= 'Z' as u8))
+            if (map[y][x].val as u8 >= 'a' as u8 && map[y][x].val as u8 <= 'z' as u8)
+                && !keys.contains(&map[y][x].val)
             {
                 all_done = false;
+                break 'outer;
             }
         }
     }
     if all_done {
-        return steps;
+        if steps_in < *lowest_res_tmp {
+            *lowest_res_tmp = steps_in;
+            println!("new lowest res: {}", lowest_res_tmp);
+        }
+
+        return 0;
     }
 
-    for y in 0..map.len() {
-        for x in 0..map[y].len() {
+    for y in 1..(map.len() - 1) {
+        for x in 1..(map[y].len() - 1) {
             map[y][x].dist = -1;
         }
     }
 
-    map[cur_y][cur_x].dist = steps;
+    map[cur_y][cur_x].dist = 0;
 
-    recursive_fill(&mut map, cur_x, cur_y, &keys_and_doors, *lowest_res);
+    recursive_fill(map, cur_x, cur_y, &keys);
 
     #[derive(Debug, PartialEq, Clone)]
     struct PossiblePath {
         x: usize,
         y: usize,
-        keys_and_doors: Vec<char>,
+        keys: HashSet<char>,
         steps: i32,
     }
 
@@ -81,11 +98,11 @@ fn recursive_search(
 
     for y in 1..map.len() - 1 {
         for x in 1..map[y].len() - 1 {
-            if !keys_and_doors.contains(&map[y][x].val)
+            if !keys.contains(&map[y][x].val)
                 && (map[y][x].val as u8 >= 'a' as u8 && map[y][x].val as u8 <= 'z' as u8)
             {
                 if map[y][x].dist != -1 {
-                    println!("{:?}", keys_and_doors);
+                    println!("{:?}", keys);
                     panic!("unexpected {}", map[y][x].val);
                 }
 
@@ -93,15 +110,14 @@ fn recursive_search(
                     let iy = ((y as i32) + dy) as usize;
                     let ix = ((x as i32) + dx) as usize;
                     let d2 = map[iy][ix].dist;
-                    if d2 != -1 && d2 + 1 < *lowest_res {
-                        let mut modified_keys_and_doors = keys_and_doors.clone();
-                        modified_keys_and_doors.push(map[y][x].val);
-                        modified_keys_and_doors.push((map[y][x].val as u8 - 32) as char);
+                    if d2 != -1 {
+                        let mut modified_keys = keys.clone();
+                        modified_keys.insert(map[y][x].val);
 
                         possible_paths.push(PossiblePath {
                             x: x,
                             y: y,
-                            keys_and_doors: modified_keys_and_doors,
+                            keys: modified_keys,
                             steps: d2 + 1,
                         });
                     }
@@ -114,45 +130,66 @@ fn recursive_search(
 
     // println!("{:?}", possible_paths);
 
+    let mut local_lowest = std::i32::MAX;
+    let mut steps_to_next = std::i32::MAX;
+
     for possible_path in possible_paths {
-        let recursive_res = recursive_search(
-            map.clone(),
-            possible_path.x,
-            possible_path.y,
-            possible_path.keys_and_doors,
-            possible_path.steps,
-            lowest_res,
-        );
-        if recursive_res < *lowest_res {
-            *lowest_res = recursive_res;
-            println!("lowest_res: {}", *lowest_res);
+        let recursive_res = possible_path.steps
+            + recursive_search(
+                map,
+                possible_path.x,
+                possible_path.y,
+                possible_path.keys,
+                steps_in + possible_path.steps,
+                visited_states,
+                lowest_res_tmp,
+            );
+        if recursive_res < local_lowest {
+            local_lowest = recursive_res;
+            steps_to_next = possible_path.steps;
+
+            if steps_in == 0 {
+                println!("lowest: {}", local_lowest);
+            }
         }
     }
 
-    //let mut prstr = String::new();
-    //prstr = format!("lowest_res: {}\n", lowest_res);
-    //prstr = format!("{}{:?}\n", prstr, keys_and_doors);
-    //for (y, ml) in map.iter().enumerate() {
-    //    for (x, p) in ml.iter().enumerate() {
-    //        if x == cur_x && y == cur_y {
-    //            prstr.push_str("@");
-    //        } else if keys_and_doors.contains(&p.val) {
-    //            prstr.push_str(".");
-    //        } else {
-    //            prstr = format!("{}{}", prstr, p.val);
-    //        }
-    //    }
-    //    prstr.push_str("\n");
-    //}
-    //println!("{}", prstr);
-    //for (y, ml) in map.iter().enumerate() {
-    //    for (x, p) in ml.iter().enumerate() {
-    //        print!("{}", p.dist);
-    //    }
-    //    println!();
-    //}
+    visited_states.push(VisitedState {
+        keys: keys.clone(),
+        pos: map[cur_y][cur_x].val,
+        steps_in: steps_in,
+        steps_to_finish: local_lowest,
+    });
 
-    return *lowest_res;
+    // let mut prstr = format!("steps_in: {:?}\n", steps_in);
+    // prstr = format!("{}local_lowest: {:?}\n", prstr, local_lowest);
+    // prstr = format!("{}steps_to_next: {:?}\n", prstr, steps_to_next);
+    // prstr = format!("{}keys: {:?}\n", prstr, keys);
+    // for (y, ml) in map.iter().enumerate() {
+    //     for (x, p) in ml.iter().enumerate() {
+    //         if x == cur_x && y == cur_y {
+    //             prstr.push_str("@");
+    //         } else if keys.contains(&p.val)
+    //             || ((p.val as u8 >= 'A' as u8 && p.val as u8 <= 'Z' as u8)
+    //                 && keys.contains(&((p.val as u8 + 32) as char)))
+    //         {
+    //             prstr.push_str(".");
+    //         } else {
+    //             prstr = format!("{}{}", prstr, p.val);
+    //         }
+    //     }
+    //     prstr.push_str("\n");
+    // }
+    // println!("{}", prstr);
+
+    // for (y, ml) in map.iter().enumerate() {
+    //     for (x, p) in ml.iter().enumerate() {
+    //         print!("{}", p.dist);
+    //     }
+    //     println!();
+    // }
+
+    return local_lowest;
 }
 
 fn main() {
@@ -187,11 +224,28 @@ fn main() {
         // println!();
     }
 
-    let mut keys_and_doors: Vec<char> = Vec::new();
-    keys_and_doors.push('@');
+    let mut keys: HashSet<char> = HashSet::new();
+    keys.insert('@');
 
-    let mut lowest_res = std::i32::MAX;
-    let res = recursive_search(map, cur_x, cur_y, keys_and_doors, 0, &mut lowest_res);
+    let mut visited_states: Vec<VisitedState> = Vec::new();
+    // visited_states.push(VisitedState {
+    //     keys: keys.clone(),
+    //     pos: '@',
+    //     steps_in: 0,
+    //     steps_to_finish: std::i32::MAX,
+    // });
+
+    let mut lowest_res_tmp = std::i32::MAX;
+
+    let res = recursive_search(
+        &mut map,
+        cur_x,
+        cur_y,
+        keys,
+        0,
+        &mut visited_states,
+        &mut lowest_res_tmp,
+    );
 
     println!("res: {}", res);
 }
