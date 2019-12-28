@@ -338,11 +338,13 @@ fn main() {
 
     let mut res = 0;
 
+    let input_program = parse_program(&input);
+
     for y in 0..50 {
         let mut map_row = Vec::new();
         for x in 0..50 {
             let mut program = ProgramState {
-                program: parse_program(&input),
+                program: input_program.clone(),
                 return_state: ReturnState::ProducedOutput,
                 inputs: vec![],
                 outputs: vec![],
