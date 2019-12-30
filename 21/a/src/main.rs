@@ -340,13 +340,28 @@ fn main() {
         relative_base: 0,
     };
 
+    // a
+    //     let jump_program = "NOT A J
+    // NOT B T
+    // OR T J
+    // NOT C T
+    // OR T J
+    // AND D J
+    // RUN\n";
+
+    //b
     let jump_program = "NOT A J
 NOT B T
 OR T J
 NOT C T
 OR T J
 AND D J
-WALK\n";
+NOT J T
+OR H T
+OR I T
+AND T J
+RUN\n";
+    //AND T J
 
     for u in jump_program.chars().map(|c| c as u8) {
         program.inputs.push(u as i64);
@@ -356,8 +371,17 @@ WALK\n";
         run_program(&mut program);
     }
 
+    let mut help_flag = false;
     for u in program.outputs {
         if u < std::u8::MAX as i64 && u >= 0 {
+            if u == '#' as u8 as i64 {
+                help_flag = true;
+            }
+            if help_flag && u == '\n' as u8 as i64 {
+                help_flag = false;
+                print!("\n   ABCDEFGHI");
+            }
+
             print!("{}", u as u8 as char);
         } else {
             println!("numeric value out of char range: {}", u);
