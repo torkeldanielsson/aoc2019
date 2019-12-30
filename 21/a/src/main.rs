@@ -340,7 +340,12 @@ fn main() {
         relative_base: 0,
     };
 
-    let jump_program = "NOT D J
+    let jump_program = "NOT A J
+NOT B T
+OR T J
+NOT C T
+OR T J
+AND D J
 WALK\n";
 
     for u in jump_program.chars().map(|c| c as u8) {
