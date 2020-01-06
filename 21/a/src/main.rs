@@ -357,8 +357,8 @@ NOT C T
 OR T J
 AND D J
 NOT J T
+OR E T
 OR H T
-OR I T
 AND T J
 RUN\n";
     //AND T J
